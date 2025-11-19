@@ -1,36 +1,36 @@
 import { NextResponse } from "next/server";
 import { prisma } from "../../lib/prisma";
 
-export const runtime = "nodejs";
-
 export async function GET(_request, { params }) {
-  const { code } = params;
+    const { code } = await params;
 
-  try {
-    const link = await prisma.link.findUnique({
-      where: { code },
-    });
-
-    if (!link) {
-      return new NextResponse("Not found", { status: 404 });
+    if (!code) {
+        return NextResponse.json({ error: "Missing code" }, { status: 400 });
     }
 
-    console.log("REDIRECT:", code, "=>", link.url);
+    try {
+        console.log("GET /[code] -> code =", code);
 
-    await prisma.link.update({
-      where: { id: link.id },
-      data: {
-        clickCount: { increment: 1 },
-        lastClicked: new Date(),
-      },
-    });
+        const link = await prisma.link.findUnique({
+            where: { code },
+        });
 
-    return NextResponse.redirect(link.url, 302);
-  } catch (err) {
-    console.error("Redirect error for code", code, err);
-    return new NextResponse(
-      "Internal error: " + (err?.message || "unknown"),
-      { status: 500 }
-    );
-  }
+        if (!link) {
+            return NextResponse.json({ error: "Not found" }, { status: 404 });
+        }
+
+        // update click count & lastClicked
+        await prisma.link.update({
+            where: { id: link.id },
+            data: {
+                clickCount: (link.clickCount || 0) + 1,
+                lastClicked: new Date(),
+            },
+        });
+
+        return NextResponse.redirect(link.url);
+    } catch (err) {
+        console.error(`GET /${code} error:`, err);
+        return NextResponse.json({ error: "Redirect failed." }, { status: 500 });
+    }
 }
